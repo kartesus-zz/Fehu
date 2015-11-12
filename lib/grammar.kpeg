@@ -23,10 +23,10 @@ eoe   = - (comment | nl) brsp
 
 literal = tagged_value | tag | float | int | string | atom
 
-pipe    = pipe:a brsp ">" - call:b { [:call, b, a] } 
-        | call:a brsp ">" - call:b { [:call, b, a] }
+pipe    = pipe:a brsp   ">" - call:b { [:call, b, [a]] } 
+        | (call | lambda):a brsp   ">" - (call | lambda):b { [:call, b, [a]] }
 
-bind    = atom:a - "=" - call:c { [:bind, a, c] }
+bind    = atom:a - "=" - expr:b { [:bind, a, b] }
 
 expr    = pipe | call | lambda
 top     = bind:b ~add(b) | expr:e ~add(e)
@@ -39,7 +39,7 @@ root = eoe* module brsp eof
 comment = "--" (!nl .)* nl
 
 # ATOM -------------------------------------------------------
-name = < /[a-z][a-z\-]*/ > { text }
+name = < /[a-z][a-z\-_]*/ > { text }
 atom = name:n { [:atom, n.to_sym] }
 
 # NUMBERS ----------------------------------------------------

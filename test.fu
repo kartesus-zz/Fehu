@@ -26,9 +26,16 @@ foo
   > extract
   > sum
 
+2 > [ x -> x ]
+
+[add 1 2] > [ x -> x ]
+
+[ x -> 2 ] > foo
+
 -- bind
 a = 2
 a = :foo 4 2
+a = [ x -> x ]
 
 -- lambda
 [ x -> 42 ]

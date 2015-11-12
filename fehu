@@ -2,16 +2,107 @@
 
 require 'pp'
 
-module Fehu; end
+class Fixnum
+  def add(n)
+    self.send(:+, n)
+  end
+
+  def mult(n)
+    self.send(:*, n)
+  end
+
+  def subtr(n)
+    self.send(:-, n)
+  end
+
+  def div(n)
+    self.send(:/, n)
+  end
+end
+
+class Float
+  def add(n)
+    self.send(:+, n)
+  end
+
+  def mult(n)
+    self.send(:*, n)
+  end
+
+  def subtr(n)
+    self.send(:-, n)
+  end
+
+  def div(n)
+    self.send(:/, n)
+  end
+end
+
+module Fehu
+  class Evaluator
+    def initialize
+      @binds = {}
+    end
+
+    def objectify(token)
+      case token[0]
+      when :int then token.last.to_i
+      when :float then token.last.to_f
+      when :string then token.last.to_s
+      when :atom then token.last.to_s
+      when :call 
+        case token[1].first
+        when :atom
+          args = token[2].map{|t| objectify(t) }.map{|t| evaluate(t) }
+          meth = objectify(token[1])
+          object = args.shift
+          lambda { object.send(meth.to_sym, *args) }
+        when :lambda
+          lam = objectify(token[1])
+          args = token[2].map{|t| objectify(t) }.map{|t| evaluate(t) }
+          lambda { lam.call(*args) }
+        end
+      when :lambda
+        args = token[1].map{|t| objectify(t) }.map(&:to_s)
+        body = objectify(token[2])
+        eval "lambda {|#{args.join(',')}| #{body}}"
+      when :bind
+        bind = objectify(token[1])
+        value = objectify(token[2])
+        @binds[bind.to_sym] = value
+      else token[0]
+      end
+    end
+
+    def evaluate(expr)
+      return expr.call if expr.respond_to?(:call) && expr.arity == 0
+      expr
+    end
+
+    def run ast
+      ast.last.map {|expr| objectify(expr) }
+              .map {|expr| evaluate(expr)  }
+    end
+  end
+end
 
 require_relative 'lib/parser'
 
-script = File.read(ARGV[0])
-parser = Fehu::Parser.new(script + "\n")
-
-if parser.parse
-  pp parser.ast
+if ARGV[0] == '-ast'
+  script = File.read(ARGV[1])
+  parser = Fehu::Parser.new(script + "\n")
+  if parser.parse
+    pp parser.ast
+  else
+    pp parser.failure_info
+  end
 else
-  pp parser.failure_info
-end
+  script = File.read(ARGV[0])
+  parser = Fehu::Parser.new(script + "\n")
 
+  if parser.parse
+    pp Fehu::Evaluator.new.run(parser.ast)
+  else
+    pp parser.failure_info
+  end
+end

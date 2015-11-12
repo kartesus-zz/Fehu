@@ -180,7 +180,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # pipe = (pipe:a brsp ">" - call:b { [:call, b, a] } | call:a brsp ">" - call:b { [:call, b, a] })
+  # pipe = (pipe:a brsp ">" - call:b { [:call, b, [a]] } | (call | lambda):a brsp ">" - (call | lambda):b { [:call, b, [a]] })
   def _pipe
 
     _save = self.pos
@@ -215,7 +215,7 @@ class Fehu::Parser < KPeg::CompiledParser
           self.pos = _save1
           break
         end
-        @result = begin;  [:call, b, a] ; end
+        @result = begin;  [:call, b, [a]] ; end
         _tmp = true
         unless _tmp
           self.pos = _save1
@@ -228,7 +228,18 @@ class Fehu::Parser < KPeg::CompiledParser
 
       _save2 = self.pos
       while true # sequence
-        _tmp = apply(:_call)
+
+        _save3 = self.pos
+        while true # choice
+          _tmp = apply(:_call)
+          break if _tmp
+          self.pos = _save3
+          _tmp = apply(:_lambda)
+          break if _tmp
+          self.pos = _save3
+          break
+        end # end choice
+
         a = @result
         unless _tmp
           self.pos = _save2
@@ -249,13 +260,24 @@ class Fehu::Parser < KPeg::CompiledParser
           self.pos = _save2
           break
         end
-        _tmp = apply(:_call)
+
+        _save4 = self.pos
+        while true # choice
+          _tmp = apply(:_call)
+          break if _tmp
+          self.pos = _save4
+          _tmp = apply(:_lambda)
+          break if _tmp
+          self.pos = _save4
+          break
+        end # end choice
+
         b = @result
         unless _tmp
           self.pos = _save2
           break
         end
-        @result = begin;  [:call, b, a] ; end
+        @result = begin;  [:call, b, [a]] ; end
         _tmp = true
         unless _tmp
           self.pos = _save2
@@ -272,7 +294,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # bind = atom:a - "=" - call:c { [:bind, a, c] }
+  # bind = atom:a - "=" - expr:b { [:bind, a, b] }
   def _bind
 
     _save = self.pos
@@ -298,13 +320,13 @@ class Fehu::Parser < KPeg::CompiledParser
         self.pos = _save
         break
       end
-      _tmp = apply(:_call)
-      c = @result
+      _tmp = apply(:_expr)
+      b = @result
       unless _tmp
         self.pos = _save
         break
       end
-      @result = begin;  [:bind, a, c] ; end
+      @result = begin;  [:bind, a, b] ; end
       _tmp = true
       unless _tmp
         self.pos = _save
@@ -536,13 +558,13 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # name = < /[a-z][a-z\-]*/ > { text }
+  # name = < /[a-z][a-z\-_]*/ > { text }
   def _name
 
     _save = self.pos
     while true # sequence
       _text_start = self.pos
-      _tmp = scan(/\A(?-mix:[a-z][a-z\-]*)/)
+      _tmp = scan(/\A(?-mix:[a-z][a-z\-_]*)/)
       if _tmp
         text = get_text(_text_start)
       end
@@ -1481,14 +1503,14 @@ class Fehu::Parser < KPeg::CompiledParser
   Rules[:_brsp] = rule_info("brsp", "(space | nl)*")
   Rules[:_eoe] = rule_info("eoe", "- (comment | nl) brsp")
   Rules[:_literal] = rule_info("literal", "(tagged_value | tag | float | int | string | atom)")
-  Rules[:_pipe] = rule_info("pipe", "(pipe:a brsp \">\" - call:b { [:call, b, a] } | call:a brsp \">\" - call:b { [:call, b, a] })")
-  Rules[:_bind] = rule_info("bind", "atom:a - \"=\" - call:c { [:bind, a, c] }")
+  Rules[:_pipe] = rule_info("pipe", "(pipe:a brsp \">\" - call:b { [:call, b, [a]] } | (call | lambda):a brsp \">\" - (call | lambda):b { [:call, b, [a]] })")
+  Rules[:_bind] = rule_info("bind", "atom:a - \"=\" - expr:b { [:bind, a, b] }")
   Rules[:_expr] = rule_info("expr", "(pipe | call | lambda)")
   Rules[:_top] = rule_info("top", "(bind:b {add(b)} | expr:e {add(e)})")
   Rules[:_module] = rule_info("module", "(comment | top eoe)+")
   Rules[:_root] = rule_info("root", "eoe* module brsp eof")
   Rules[:_comment] = rule_info("comment", "\"--\" (!nl .)* nl")
-  Rules[:_name] = rule_info("name", "< /[a-z][a-z\\-]*/ > { text }")
+  Rules[:_name] = rule_info("name", "< /[a-z][a-z\\-_]*/ > { text }")
   Rules[:_atom] = rule_info("atom", "name:n { [:atom, n.to_sym] }")
   Rules[:_number] = rule_info("number", "< (\"0\" | /[1-9][0-9]*/) > { text }")
   Rules[:_int] = rule_info("int", "number:n { [:int, n.to_i] }")
