@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+
+require 'pp'
+
+module Fehu; end
+
+require_relative 'lib/parser'
+
+script = File.read(ARGV[0])
+parser = Fehu::Parser.new(script + "\n")
+
+if parser.parse
+  pp parser.ast
+else
+  pp parser.failure_info
+end
+
