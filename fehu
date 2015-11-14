@@ -1,7 +1,5 @@
 #!/usr/bin/env ruby
 
-require 'pp'
-
 module Fehu; end
 
 require_relative 'lib/parser'
@@ -12,6 +10,9 @@ require_relative 'lib/ast/atom'
 require_relative 'lib/ast/tag'
 require_relative 'lib/ast/call'
 require_relative 'lib/ast/lambda'
+require_relative 'lib/ast/bind'
+
+require_relative 'lib/std/extensions'
 
 if ARGV[0] == '-ast'
   script = File.read(ARGV[1])
@@ -26,8 +27,10 @@ else
   parser = Fehu::Parser.new(script + "\n")
 
   if parser.parse
-    pp Fehu::Evaluator.new.run(parser.ast)
+    env = {}
+    parser.ast.last.each{|node| node.run(env) }
+    puts
   else
-    pp parser.failure_info
+    p parser.failure_info
   end
 end

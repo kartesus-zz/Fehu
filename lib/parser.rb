@@ -7,11 +7,11 @@ class Fehu::Parser < KPeg::CompiledParser
 
   def initialize(*args)
     super
-    @ast = [:module, []]
+    @ast = [:module, :main, []]
   end
 
   def add(node)
-    @ast = [:module, @ast.last.push(node)]
+    @ast = [:module, :main, @ast.last.push(node)]
   end
 
 
@@ -378,7 +378,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # bind = atom:a - "=" - expr:b { [:bind, a, b] }
+  # bind = atom:a - "=" - expr:b {bind(a, b)}
   def _bind
 
     _save = self.pos
@@ -410,7 +410,7 @@ class Fehu::Parser < KPeg::CompiledParser
         self.pos = _save
         break
       end
-      @result = begin;  [:bind, a, b] ; end
+      @result = begin; bind(a, b); end
       _tmp = true
       unless _tmp
         self.pos = _save
@@ -1589,7 +1589,7 @@ class Fehu::Parser < KPeg::CompiledParser
   Rules[:_eoe] = rule_info("eoe", "- (comment | nl) brsp")
   Rules[:_literal] = rule_info("literal", "(tag | float | int | string | atom)")
   Rules[:_pipe] = rule_info("pipe", "(pipe:a brsp \">\" - call:b {call(b, [a])} | (call | lambda):a brsp \">\" - (call | lambda):b {call(b, [a])})")
-  Rules[:_bind] = rule_info("bind", "atom:a - \"=\" - expr:b { [:bind, a, b] }")
+  Rules[:_bind] = rule_info("bind", "atom:a - \"=\" - expr:b {bind(a, b)}")
   Rules[:_expr] = rule_info("expr", "(pipe | call | lambda)")
   Rules[:_top] = rule_info("top", "(bind:b {add(b)} | expr:e {add(e)})")
   Rules[:_module] = rule_info("module", "(comment | top eoe)+")

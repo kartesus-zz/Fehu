@@ -1,0 +1,2 @@
+hello = [ name -> [str "Hello, " name] ]
+[hello "World"] > puts

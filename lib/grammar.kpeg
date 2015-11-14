@@ -5,11 +5,11 @@
 
   def initialize(*args)
     super
-    @ast = [:module, []]
+    @ast = [:module, :main, []]
   end
 
   def add(node)
-    @ast = [:module, @ast.last.push(node)]
+    @ast = [:module, :main, @ast.last.push(node)]
   end
 }
 
@@ -36,7 +36,7 @@ literal = tag | float | int | string | atom
 pipe    = pipe:a brsp   ">" - call:b ~call(b, [a])
         | (call | lambda):a brsp   ">" - (call | lambda):b ~call(b, [a])
 
-bind    = atom:a - "=" - expr:b { [:bind, a, b] }
+bind    = atom:a - "=" - expr:b ~bind(a, b)
 
 expr    = pipe | call | lambda
 top     = bind:b ~add(b) | expr:e ~add(e)
