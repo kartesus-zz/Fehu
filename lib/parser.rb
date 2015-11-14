@@ -17,6 +17,93 @@ class Fehu::Parser < KPeg::CompiledParser
 
   # :stopdoc:
 
+  module ::Fehu::AST
+    class Node; end
+    class Atom < Node
+      def initialize(name)
+        @name = name
+      end
+      attr_reader :name
+    end
+    class Bind < Node
+      def initialize(atom, expr)
+        @atom = atom
+        @expr = expr
+      end
+      attr_reader :atom
+      attr_reader :expr
+    end
+    class Call < Node
+      def initialize(callable, arguments)
+        @callable = callable
+        @arguments = arguments
+      end
+      attr_reader :callable
+      attr_reader :arguments
+    end
+    class Float < Node
+      def initialize(value)
+        @value = value
+      end
+      attr_reader :value
+    end
+    class Int < Node
+      def initialize(value)
+        @value = value
+      end
+      attr_reader :value
+    end
+    class Lambda < Node
+      def initialize(params, expr)
+        @params = params
+        @expr = expr
+      end
+      attr_reader :params
+      attr_reader :expr
+    end
+    class String < Node
+      def initialize(value)
+        @value = value
+      end
+      attr_reader :value
+    end
+    class Tag < Node
+      def initialize(name, values)
+        @name = name
+        @values = values
+      end
+      attr_reader :name
+      attr_reader :values
+    end
+  end
+  module ::Fehu::ASTConstruction
+    def atom(name)
+      ::Fehu::AST::Atom.new(name)
+    end
+    def bind(atom, expr)
+      ::Fehu::AST::Bind.new(atom, expr)
+    end
+    def call(callable, arguments)
+      ::Fehu::AST::Call.new(callable, arguments)
+    end
+    def float(value)
+      ::Fehu::AST::Float.new(value)
+    end
+    def int(value)
+      ::Fehu::AST::Int.new(value)
+    end
+    def lambda(params, expr)
+      ::Fehu::AST::Lambda.new(params, expr)
+    end
+    def string(value)
+      ::Fehu::AST::String.new(value)
+    end
+    def tag(name, values)
+      ::Fehu::AST::Tag.new(name, values)
+    end
+  end
+  include ::Fehu::ASTConstruction
+
   # eof = !.
   def _eof
     _save = self.pos
@@ -150,14 +237,11 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # literal = (tagged_value | tag | float | int | string | atom)
+  # literal = (tag | float | int | string | atom)
   def _literal
 
     _save = self.pos
     while true # choice
-      _tmp = apply(:_tagged_value)
-      break if _tmp
-      self.pos = _save
       _tmp = apply(:_tag)
       break if _tmp
       self.pos = _save
@@ -180,7 +264,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # pipe = (pipe:a brsp ">" - call:b { [:call, b, [a]] } | (call | lambda):a brsp ">" - (call | lambda):b { [:call, b, [a]] })
+  # pipe = (pipe:a brsp ">" - call:b {call(b, [a])} | (call | lambda):a brsp ">" - (call | lambda):b {call(b, [a])})
   def _pipe
 
     _save = self.pos
@@ -215,7 +299,7 @@ class Fehu::Parser < KPeg::CompiledParser
           self.pos = _save1
           break
         end
-        @result = begin;  [:call, b, [a]] ; end
+        @result = begin; call(b, [a]); end
         _tmp = true
         unless _tmp
           self.pos = _save1
@@ -277,7 +361,7 @@ class Fehu::Parser < KPeg::CompiledParser
           self.pos = _save2
           break
         end
-        @result = begin;  [:call, b, [a]] ; end
+        @result = begin; call(b, [a]); end
         _tmp = true
         unless _tmp
           self.pos = _save2
@@ -584,7 +668,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # atom = name:n { [:atom, n.to_sym] }
+  # atom = name:n {atom(n)}
   def _atom
 
     _save = self.pos
@@ -595,7 +679,7 @@ class Fehu::Parser < KPeg::CompiledParser
         self.pos = _save
         break
       end
-      @result = begin;  [:atom, n.to_sym] ; end
+      @result = begin; atom(n); end
       _tmp = true
       unless _tmp
         self.pos = _save
@@ -644,7 +728,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # int = number:n { [:int, n.to_i] }
+  # int = number:n {int(n)}
   def _int
 
     _save = self.pos
@@ -655,7 +739,7 @@ class Fehu::Parser < KPeg::CompiledParser
         self.pos = _save
         break
       end
-      @result = begin;  [:int, n.to_i] ; end
+      @result = begin; int(n); end
       _tmp = true
       unless _tmp
         self.pos = _save
@@ -667,7 +751,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # float = number:w "." number:f { [:float, "#{w}.#{f}".to_f] }
+  # float = number:w "." number:f {float("#{w}.#{f}".to_f)}
   def _float
 
     _save = self.pos
@@ -689,7 +773,7 @@ class Fehu::Parser < KPeg::CompiledParser
         self.pos = _save
         break
       end
-      @result = begin;  [:float, "#{w}.#{f}".to_f] ; end
+      @result = begin; float("#{w}.#{f}".to_f); end
       _tmp = true
       unless _tmp
         self.pos = _save
@@ -701,44 +785,21 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # tag = ":" name:n { [:tag, n] }
+  # tag = (":" name:n (space call)+:l {tag(n, l)} | ":" name:n {tag(n, [])} | "(" - tag:t - ")" { t })
   def _tag
-
-    _save = self.pos
-    while true # sequence
-      _tmp = match_string(":")
-      unless _tmp
-        self.pos = _save
-        break
-      end
-      _tmp = apply(:_name)
-      n = @result
-      unless _tmp
-        self.pos = _save
-        break
-      end
-      @result = begin;  [:tag, n] ; end
-      _tmp = true
-      unless _tmp
-        self.pos = _save
-      end
-      break
-    end # end sequence
-
-    set_failed_rule :_tag unless _tmp
-    return _tmp
-  end
-
-  # tagged_value = (tag:t (space call)+:l { t.concat(l) } | "(" - tagged_value:t - ")" { t })
-  def _tagged_value
 
     _save = self.pos
     while true # choice
 
       _save1 = self.pos
       while true # sequence
-        _tmp = apply(:_tag)
-        t = @result
+        _tmp = match_string(":")
+        unless _tmp
+          self.pos = _save1
+          break
+        end
+        _tmp = apply(:_name)
+        n = @result
         unless _tmp
           self.pos = _save1
           break
@@ -791,7 +852,7 @@ class Fehu::Parser < KPeg::CompiledParser
           self.pos = _save1
           break
         end
-        @result = begin;  t.concat(l) ; end
+        @result = begin; tag(n, l); end
         _tmp = true
         unless _tmp
           self.pos = _save1
@@ -804,33 +865,18 @@ class Fehu::Parser < KPeg::CompiledParser
 
       _save5 = self.pos
       while true # sequence
-        _tmp = match_string("(")
+        _tmp = match_string(":")
         unless _tmp
           self.pos = _save5
           break
         end
-        _tmp = apply(:__hyphen_)
+        _tmp = apply(:_name)
+        n = @result
         unless _tmp
           self.pos = _save5
           break
         end
-        _tmp = apply(:_tagged_value)
-        t = @result
-        unless _tmp
-          self.pos = _save5
-          break
-        end
-        _tmp = apply(:__hyphen_)
-        unless _tmp
-          self.pos = _save5
-          break
-        end
-        _tmp = match_string(")")
-        unless _tmp
-          self.pos = _save5
-          break
-        end
-        @result = begin;  t ; end
+        @result = begin; tag(n, []); end
         _tmp = true
         unless _tmp
           self.pos = _save5
@@ -840,10 +886,49 @@ class Fehu::Parser < KPeg::CompiledParser
 
       break if _tmp
       self.pos = _save
+
+      _save6 = self.pos
+      while true # sequence
+        _tmp = match_string("(")
+        unless _tmp
+          self.pos = _save6
+          break
+        end
+        _tmp = apply(:__hyphen_)
+        unless _tmp
+          self.pos = _save6
+          break
+        end
+        _tmp = apply(:_tag)
+        t = @result
+        unless _tmp
+          self.pos = _save6
+          break
+        end
+        _tmp = apply(:__hyphen_)
+        unless _tmp
+          self.pos = _save6
+          break
+        end
+        _tmp = match_string(")")
+        unless _tmp
+          self.pos = _save6
+          break
+        end
+        @result = begin;  t ; end
+        _tmp = true
+        unless _tmp
+          self.pos = _save6
+        end
+        break
+      end # end sequence
+
+      break if _tmp
+      self.pos = _save
       break
     end # end choice
 
-    set_failed_rule :_tagged_value unless _tmp
+    set_failed_rule :_tag unless _tmp
     return _tmp
   end
 
@@ -1226,7 +1311,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # string = "\"" string_body:s "\"" { [:string, s.join] }
+  # string = "\"" string_body:s "\"" {string(s.join)}
   def _string
 
     _save = self.pos
@@ -1247,7 +1332,7 @@ class Fehu::Parser < KPeg::CompiledParser
         self.pos = _save
         break
       end
-      @result = begin;  [:string, s.join] ; end
+      @result = begin; string(s.join); end
       _tmp = true
       unless _tmp
         self.pos = _save
@@ -1309,7 +1394,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # call = ("[" (atom | lambda):a brsp parameters:b - "]" { [:call, a, b] } | literal)
+  # call = ("[" (atom | lambda):a brsp parameters:b - "]" {call(a, b)} | literal)
   def _call
 
     _save = self.pos
@@ -1360,7 +1445,7 @@ class Fehu::Parser < KPeg::CompiledParser
           self.pos = _save1
           break
         end
-        @result = begin;  [:call, a, b] ; end
+        @result = begin; call(a, b); end
         _tmp = true
         unless _tmp
           self.pos = _save1
@@ -1430,7 +1515,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # lambda = "[" sp arguments:a sp "->" sp expr:b sp "]" { [:lambda, a, b] }
+  # lambda = "[" sp arguments:a sp "->" sp expr:b sp "]" {lambda(a, b)}
   def _lambda
 
     _save = self.pos
@@ -1482,7 +1567,7 @@ class Fehu::Parser < KPeg::CompiledParser
         self.pos = _save
         break
       end
-      @result = begin;  [:lambda, a, b] ; end
+      @result = begin; lambda(a, b); end
       _tmp = true
       unless _tmp
         self.pos = _save
@@ -1502,8 +1587,8 @@ class Fehu::Parser < KPeg::CompiledParser
   Rules[:__hyphen_] = rule_info("-", "space*")
   Rules[:_brsp] = rule_info("brsp", "(space | nl)*")
   Rules[:_eoe] = rule_info("eoe", "- (comment | nl) brsp")
-  Rules[:_literal] = rule_info("literal", "(tagged_value | tag | float | int | string | atom)")
-  Rules[:_pipe] = rule_info("pipe", "(pipe:a brsp \">\" - call:b { [:call, b, [a]] } | (call | lambda):a brsp \">\" - (call | lambda):b { [:call, b, [a]] })")
+  Rules[:_literal] = rule_info("literal", "(tag | float | int | string | atom)")
+  Rules[:_pipe] = rule_info("pipe", "(pipe:a brsp \">\" - call:b {call(b, [a])} | (call | lambda):a brsp \">\" - (call | lambda):b {call(b, [a])})")
   Rules[:_bind] = rule_info("bind", "atom:a - \"=\" - expr:b { [:bind, a, b] }")
   Rules[:_expr] = rule_info("expr", "(pipe | call | lambda)")
   Rules[:_top] = rule_info("top", "(bind:b {add(b)} | expr:e {add(e)})")
@@ -1511,20 +1596,19 @@ class Fehu::Parser < KPeg::CompiledParser
   Rules[:_root] = rule_info("root", "eoe* module brsp eof")
   Rules[:_comment] = rule_info("comment", "\"--\" (!nl .)* nl")
   Rules[:_name] = rule_info("name", "< /[a-z][a-z\\-_]*/ > { text }")
-  Rules[:_atom] = rule_info("atom", "name:n { [:atom, n.to_sym] }")
+  Rules[:_atom] = rule_info("atom", "name:n {atom(n)}")
   Rules[:_number] = rule_info("number", "< (\"0\" | /[1-9][0-9]*/) > { text }")
-  Rules[:_int] = rule_info("int", "number:n { [:int, n.to_i] }")
-  Rules[:_float] = rule_info("float", "number:w \".\" number:f { [:float, \"\#{w}.\#{f}\".to_f] }")
-  Rules[:_tag] = rule_info("tag", "\":\" name:n { [:tag, n] }")
-  Rules[:_tagged_value] = rule_info("tagged_value", "(tag:t (space call)+:l { t.concat(l) } | \"(\" - tagged_value:t - \")\" { t })")
+  Rules[:_int] = rule_info("int", "number:n {int(n)}")
+  Rules[:_float] = rule_info("float", "number:w \".\" number:f {float(\"\#{w}.\#{f}\".to_f)}")
+  Rules[:_tag] = rule_info("tag", "(\":\" name:n (space call)+:l {tag(n, l)} | \":\" name:n {tag(n, [])} | \"(\" - tag:t - \")\" { t })")
   Rules[:_num_escapes] = rule_info("num_escapes", "(< /[0-7]{1,3}/ > { [text.to_i(8)].pack(\"U\") } | \"x\" < /[a-f\\d]{2}/i > { [text.to_i(16)].pack(\"U\") })")
   Rules[:_string_escapes] = rule_info("string_escapes", "(\"n\" { \"\\n\" } | \"s\" { \" \" } | \"r\" { \"\\r\" } | \"t\" { \"\\t\" } | \"v\" { \"\\v\" } | \"f\" { \"\\f\" } | \"b\" { \"\\b\" } | \"a\" { \"\\a\" } | \"e\" { \"\\e\" } | \"\\\\\" { \"\\\\\" } | \"\\\"\" { \"\\\"\" } | num_escapes | < . > { text })")
   Rules[:_string_seq] = rule_info("string_seq", "< /[^\\\\\"]+/ > { text }")
   Rules[:_string_body] = rule_info("string_body", "(\"\\\\\" string_escapes:s | string_seq:s)*:ary { Array(ary) }")
-  Rules[:_string] = rule_info("string", "\"\\\"\" string_body:s \"\\\"\" { [:string, s.join] }")
+  Rules[:_string] = rule_info("string", "\"\\\"\" string_body:s \"\\\"\" {string(s.join)}")
   Rules[:_parameters] = rule_info("parameters", "expr:h (brsp expr)*:t { [h] + t }")
-  Rules[:_call] = rule_info("call", "(\"[\" (atom | lambda):a brsp parameters:b - \"]\" { [:call, a, b] } | literal)")
+  Rules[:_call] = rule_info("call", "(\"[\" (atom | lambda):a brsp parameters:b - \"]\" {call(a, b)} | literal)")
   Rules[:_arguments] = rule_info("arguments", "literal:h (sp literal)*:t { [h] + t }")
-  Rules[:_lambda] = rule_info("lambda", "\"[\" sp arguments:a sp \"->\" sp expr:b sp \"]\" { [:lambda, a, b] }")
+  Rules[:_lambda] = rule_info("lambda", "\"[\" sp arguments:a sp \"->\" sp expr:b sp \"]\" {lambda(a, b)}")
   # :startdoc:
 end

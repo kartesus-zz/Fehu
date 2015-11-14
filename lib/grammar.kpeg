@@ -13,6 +13,16 @@
   end
 }
 
+%% ast-location = ::Fehu::AST
+%% int          = ast Int(value)
+%% float        = ast Float(value)
+%% string       = ast String(value)
+%% atom         = ast Atom(name)
+%% tag          = ast Tag(name, values)
+%% call         = ast Call(callable, arguments)
+%% lambda       = ast Lambda(params, expr)
+%% bind         = ast Bind(atom, expr)
+
 eof   = !.
 space = " " | "\t"
 nl    = "\n" | ";"
@@ -21,10 +31,10 @@ sp    = space+
 brsp  = (space | nl)*
 eoe   = - (comment | nl) brsp
 
-literal = tagged_value | tag | float | int | string | atom
+literal = tag | float | int | string | atom
 
-pipe    = pipe:a brsp   ">" - call:b { [:call, b, [a]] } 
-        | (call | lambda):a brsp   ">" - (call | lambda):b { [:call, b, [a]] }
+pipe    = pipe:a brsp   ">" - call:b ~call(b, [a])
+        | (call | lambda):a brsp   ">" - (call | lambda):b ~call(b, [a])
 
 bind    = atom:a - "=" - expr:b { [:bind, a, b] }
 
@@ -40,28 +50,28 @@ comment = "--" (!nl .)* nl
 
 # ATOM -------------------------------------------------------
 name = < /[a-z][a-z\-_]*/ > { text }
-atom = name:n { [:atom, n.to_sym] }
+atom = name:n ~atom(n)
 
 # NUMBERS ----------------------------------------------------
 number = < ( "0" | /[1-9][0-9]*/ ) > { text }
-int    = number:n { [:int, n.to_i] }
-float  = number:w "." number:f { [:float, "#{w}.#{f}".to_f] }
+int    = number:n ~int(n)
+float  = number:w "." number:f ~float("#{w}.#{f}".to_f)
 
 # TAGS -------------------------------------------------------
-tag           = ":" name:n { [:tag, n] }
-tagged_value  = tag:t (space call)+:l { t.concat(l) }
-              | "(" - tagged_value:t - ")" { t }
+tag           = ":" name:n (space call)+:l ~tag(n, l)
+              | ":" name:n ~tag(n, [])
+              | "(" - tag:t - ")" { t }
 
 # STRING -----------------------------------------------------
 num_escapes     = < /[0-7]{1,3}/ > { [text.to_i(8)].pack("U") } | "x" < /[a-f\d]{2}/i > { [text.to_i(16)].pack("U") }
 string_escapes  = "n" { "\n" } | "s" { " " } | "r" { "\r" } | "t" { "\t" } | "v" { "\v" } | "f" { "\f" } | "b" { "\b" } | "a" { "\a" } | "e" { "\e" } | "\\" { "\\" } | "\"" { "\"" } | num_escapes | < . > { text }
 string_seq      = < /[^\\"]+/ > { text }
 string_body     = ("\\" string_escapes:s | string_seq:s)*:ary { Array(ary) }
-string          = "\"" string_body:s "\"" { [:string, s.join] }
+string          = "\"" string_body:s "\"" ~string(s.join)
 
 # FUNCTION ---------------------------------------------------
 parameters = expr:h (brsp expr)*:t { [h] + t }
-call       = "[" (atom | lambda):a brsp parameters:b - "]" { [:call, a, b] } | literal
+call       = "[" (atom | lambda):a brsp parameters:b - "]" ~call(a, b) | literal
 
 arguments = literal:h (sp literal)*:t { [h] + t }
-lambda    = "[" sp arguments:a sp "->" sp expr:b sp "]" { [:lambda, a, b] }
+lambda    = "[" sp arguments:a sp "->" sp expr:b sp "]" ~lambda(a, b)
