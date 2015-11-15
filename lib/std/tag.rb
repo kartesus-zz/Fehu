@@ -22,6 +22,10 @@ module Std
     def matches(tag)
       @values.zip(tag.values)
     end
+
+    def to_s
+      "(#{@name} #{@values.join(' ')})"
+    end
   end
 
 end

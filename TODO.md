@@ -1,13 +1,11 @@
-# Before talking about it
 - Guards
-
-# Before defining platform
 - Lists
 - Maps
-- Let expressions
+- Expressions
 - Modules
 - Protocols
-- Concurrency model
-
-# Before website
+- Concurrency
+- Syntax
 - Browser interpreter
+- Package manager
+- Task runner

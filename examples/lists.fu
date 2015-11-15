@@ -1,0 +1,8 @@
+a = :cons 1 (:cons 2 (:cons 3 :empty))
+
+map = [ f (:cons x xs) -> :cons [f x] [map f xs]
+      | f :empty       -> :empty ]
+
+plus-two = [map [add 2 _] _]
+
+a > plus-two > puts
