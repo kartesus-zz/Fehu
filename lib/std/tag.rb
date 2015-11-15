@@ -24,7 +24,11 @@ module Std
     end
 
     def to_s
-      "(#{@name} #{@values.join(' ')})"
+      if @values.empty?
+        "#{@name}"
+      else
+        "(#{@name} #{@values.join(' ')})"
+      end
     end
   end
 

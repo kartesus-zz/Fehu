@@ -1,7 +1,0 @@
-print = [ :some 42 -> [puts "the answer"]
-        | :some x  -> [str "some " x] > puts
-        | :none    -> :nil ]
-
-:some 42 > print 
-:some "value" > print
-:none > print 

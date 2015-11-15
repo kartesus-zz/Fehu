@@ -3,6 +3,11 @@ a = :cons 1 (:cons 2 (:cons 3 :empty))
 map = [ f (:cons x xs) -> :cons [f x] [map f xs]
       | f :empty       -> :empty ]
 
-plus-two = [map [add 2 _] _]
+foldl = [ f acc (:cons x xs) -> [foldl f [f acc x] xs]
+        | f acc :empty       -> acc ]
 
-a > plus-two > puts
+plus-two = [map [add 2 _] _]
+sum = [foldl add 0 _]
+
+[plus-two a] > puts
+[sum a] > puts
