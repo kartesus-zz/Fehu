@@ -19,23 +19,20 @@ require_relative 'lib/ast/blank'
 
 require_relative 'lib/std/extensions'
 
-if ARGV[0] == '-ast'
-  script = File.read(ARGV[1])
+def ast(script)
   parser = Fehu::Parser.new(script + "\n")
   if parser.parse
-    pp parser.ast.last.map(&:rewrite)
+    parser.ast.last.map(&:rewrite)
   else
-    pp parser.failure_info
+    raise parser.failure_info
   end
+end
+
+if ARGV[0] == '-ast'
+  pp ast(File.read ARGV[1])
 else
   script = File.read(ARGV[0])
-  parser = Fehu::Parser.new(script + "\n")
-
-  if parser.parse
-    env = {}
-    parser.ast.last.map(&:rewrite).each{|node| node.run(env) }
-    puts
-  else
-    p parser.failure_info
-  end
+  env = {}
+  ast(script).each{|node| node.run(env) }
+  puts
 end

@@ -275,7 +275,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # pipe = (pipe:a brsp ">" - call:b {call(b, [a])} | (call | lambda):a brsp ">" - (call | lambda):b {call(b, [a])})
+  # pipe = (pipe:a brsp ">" - call:b {call(b, [a])} | (call | lambda):a brsp ">" - (call | lambda):b {call(b, [a])} | "(" - pipe - ")")
   def _pipe
 
     _save = self.pos
@@ -376,6 +376,38 @@ class Fehu::Parser < KPeg::CompiledParser
         _tmp = true
         unless _tmp
           self.pos = _save2
+        end
+        break
+      end # end sequence
+
+      break if _tmp
+      self.pos = _save
+
+      _save5 = self.pos
+      while true # sequence
+        _tmp = match_string("(")
+        unless _tmp
+          self.pos = _save5
+          break
+        end
+        _tmp = apply(:__hyphen_)
+        unless _tmp
+          self.pos = _save5
+          break
+        end
+        _tmp = apply(:_pipe)
+        unless _tmp
+          self.pos = _save5
+          break
+        end
+        _tmp = apply(:__hyphen_)
+        unless _tmp
+          self.pos = _save5
+          break
+        end
+        _tmp = match_string(")")
+        unless _tmp
+          self.pos = _save5
         end
         break
       end # end sequence
@@ -1757,7 +1789,7 @@ class Fehu::Parser < KPeg::CompiledParser
   Rules[:_brsp] = rule_info("brsp", "(space | nl)*")
   Rules[:_eoe] = rule_info("eoe", "- (comment | \";\" | nl) brsp")
   Rules[:_literal] = rule_info("literal", "(tag | float | int | string | atom)")
-  Rules[:_pipe] = rule_info("pipe", "(pipe:a brsp \">\" - call:b {call(b, [a])} | (call | lambda):a brsp \">\" - (call | lambda):b {call(b, [a])})")
+  Rules[:_pipe] = rule_info("pipe", "(pipe:a brsp \">\" - call:b {call(b, [a])} | (call | lambda):a brsp \">\" - (call | lambda):b {call(b, [a])} | \"(\" - pipe - \")\")")
   Rules[:_bind] = rule_info("bind", "atom:a - \"=\" - expr:b {bind(a, b)}")
   Rules[:_expr] = rule_info("expr", "(pipe | call | lambda)")
   Rules[:_top] = rule_info("top", "(bind:b {add(b)} | expr:e {add(e)})")

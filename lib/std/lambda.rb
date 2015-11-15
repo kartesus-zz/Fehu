@@ -8,7 +8,10 @@ module Std
     end
 
     def call(args)
-      @cases.map{|c| c.run(@env).call(args) }.compact.first
+      for c in @cases
+        result = c.run(@env).call(args)
+        return result if result
+      end
     end
   end
 

@@ -37,6 +37,7 @@ literal = tag | float | int | string | atom
 
 pipe    = pipe:a brsp   ">" - call:b ~call(b, [a])
         | (call | lambda):a brsp   ">" - (call | lambda):b ~call(b, [a])
+        | "(" - pipe - ")"
 
 bind    = atom:a - "=" - expr:b ~bind(a, b)
 

@@ -1,14 +1,14 @@
 class Fixnum
   alias :add :+
   alias :mult :*
-  alias :substr :-
+  alias :subtr :-
   alias :div :/
 end
 
 class Float
   alias :add :+
   alias :mult :*
-  alias :substr :-
+  alias :subtr :-
   alias :div :/
 end
 

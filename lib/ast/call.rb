@@ -16,12 +16,12 @@ class Fehu::AST::Call
     elsif callable.is_a?(Fehu::Std::Lambda)
       callable.call(arguments(@arguments, env))
     elsif Kernel.respond_to?(callable)
-      Kernel.send(callable, arguments(@arguments, env))
+      Kernel.send(callable, *arguments(@arguments, env))
     else
       object = @arguments.first.run(env)
       object = env[object] if object.is_a?(Symbol) && env.key?(object)
       method = @callable.run(env)
-      object.send(method, arguments(@arguments.slice(1..-1), env))
+      object.send(method, *arguments(@arguments.slice(1..-1), env))
     end
   end
 
