@@ -16,20 +16,22 @@
 %% ast-location = ::Fehu::AST
 %% int          = ast Int(value)
 %% float        = ast Float(value)
-%% string       = ast String(value)
+%% strlit       = ast String(value)
 %% atom         = ast Atom(name)
 %% tag          = ast Tag(name, values)
 %% call         = ast Call(callable, arguments)
-%% lambda       = ast Lambda(params, expr)
+%% lcase        = ast Case(params, expr)
+%% lambda       = ast Lambda(cases)
 %% bind         = ast Bind(atom, expr)
+%% blank        = ast Blank()
 
 eof   = !.
-space = " " | "\t"
-nl    = "\n" | ";"
+space = " " | "\t" | ","
+nl    = "\n" 
 sp    = space+
 -     = space*
 brsp  = (space | nl)*
-eoe   = - (comment | nl) brsp
+eoe   = - (comment | ";" | nl) brsp
 
 literal = tag | float | int | string | atom
 
@@ -65,13 +67,17 @@ tag           = ":" name:n (space call)+:l ~tag(n, l)
 # STRING -----------------------------------------------------
 num_escapes     = < /[0-7]{1,3}/ > { [text.to_i(8)].pack("U") } | "x" < /[a-f\d]{2}/i > { [text.to_i(16)].pack("U") }
 string_escapes  = "n" { "\n" } | "s" { " " } | "r" { "\r" } | "t" { "\t" } | "v" { "\v" } | "f" { "\f" } | "b" { "\b" } | "a" { "\a" } | "e" { "\e" } | "\\" { "\\" } | "\"" { "\"" } | num_escapes | < . > { text }
-string_seq      = < /[^\\"]+/ > { text }
+string_seq      = < /[^\\"\n]+/ > { text }
 string_body     = ("\\" string_escapes:s | string_seq:s)*:ary { Array(ary) }
-string          = "\"" string_body:s "\"" ~string(s.join)
+string          = "\"" string_body:s "\"" ~strlit(s.join)
 
 # FUNCTION ---------------------------------------------------
-parameters = expr:h (brsp expr)*:t { [h] + t }
-call       = "[" (atom | lambda):a brsp parameters:b - "]" ~call(a, b) | literal
+parameters = (expr | blank):h (brsp (expr | blank))*:t { [h] + t }
+blank      = "_" ~blank()
+call       = "[" (atom | lambda):a brsp parameters:b - "]" ~call(a, b) 
+           | atom:a "!" ~call(a, [])
+           | literal
 
-arguments = literal:h (sp literal)*:t { [h] + t }
-lambda    = "[" sp arguments:a sp "->" sp expr:b sp "]" ~lambda(a, b)
+arguments = literal:h (sp literal)*:t { [h] + t } | < "!" > { [] }
+case      = arguments:a sp "->" sp expr:b ~lcase(a, b)
+lambda    = "[" sp case:a (brsp "|" brsp case)*:b sp "]" ~lambda([a].concat(b))

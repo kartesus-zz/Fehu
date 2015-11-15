@@ -1,24 +1,13 @@
-# Before useful
+# Before talking about it
+- Pattern Matching
 
-## Open
-- Add let-bound blocks
-- Pattern matching lambdas
-- Atom pattern matching
-- REPL
-- Syntax description (vim, atom)
+# Before defining platform
+- Lists
+- Maps
+- Let expressions
+- Modules
+- Protocols
+- Concurrency model
 
-# Done
-- Add indentation support where needed (pipes, lambda, calls, ...)
-- Atom binding
-
-
-## Done
-
-
-# Before decide on platform
-
-## Open
-- Partial application
-- Continuation
-- Standard Library & tags
-- Concurrency
+# Before website
+- Browser interpreter

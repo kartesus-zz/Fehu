@@ -2,16 +2,13 @@ module Fehu
 module Std
 
   class Lambda
-    def initialize(env, params, expr)
-      @env = env
-      @expr = expr
-      @params = params
+    def initialize(env, cases)
+      @cases = cases
+      @env   = env
     end
 
-    def call(*args)
-      params = @params.zip(args).to_h
-      env = @env.merge(params)
-      @expr.run(env)
+    def call(args)
+      @cases.map{|c| c.run(@env).call(args) }.compact.first
     end
   end
 

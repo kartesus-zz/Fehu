@@ -1,2 +1,18 @@
-hello = [ name -> [str "Hello, " name] ]
-[hello "World"] > puts
+greet = [ greeting name -> [str greeting ", " name "!"]
+        | name          -> [greet "Hello" name]
+        | !             -> "Hello, World!" ]
+
+[puts "Hello, World"]
+
+[puts [greet "Hello" "World"]]
+[greet "Hello" "World"] > puts
+
+[greet "World"] > puts
+
+[puts greet!]
+greet! > puts
+
+greet-es = [greet "Hola" _]
+[greet-es "Mundo"] > puts
+
+"Halo" > [greet _ "Welt"] > puts

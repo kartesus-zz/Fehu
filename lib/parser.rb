@@ -33,6 +33,10 @@ class Fehu::Parser < KPeg::CompiledParser
       attr_reader :atom
       attr_reader :expr
     end
+    class Blank < Node
+      def initialize()
+      end
+    end
     class Call < Node
       def initialize(callable, arguments)
         @callable = callable
@@ -54,6 +58,12 @@ class Fehu::Parser < KPeg::CompiledParser
       attr_reader :value
     end
     class Lambda < Node
+      def initialize(cases)
+        @cases = cases
+      end
+      attr_reader :cases
+    end
+    class Case < Node
       def initialize(params, expr)
         @params = params
         @expr = expr
@@ -83,6 +93,9 @@ class Fehu::Parser < KPeg::CompiledParser
     def bind(atom, expr)
       ::Fehu::AST::Bind.new(atom, expr)
     end
+    def blank()
+      ::Fehu::AST::Blank.new()
+    end
     def call(callable, arguments)
       ::Fehu::AST::Call.new(callable, arguments)
     end
@@ -92,10 +105,13 @@ class Fehu::Parser < KPeg::CompiledParser
     def int(value)
       ::Fehu::AST::Int.new(value)
     end
-    def lambda(params, expr)
-      ::Fehu::AST::Lambda.new(params, expr)
+    def lambda(cases)
+      ::Fehu::AST::Lambda.new(cases)
     end
-    def string(value)
+    def lcase(params, expr)
+      ::Fehu::AST::Case.new(params, expr)
+    end
+    def strlit(value)
       ::Fehu::AST::String.new(value)
     end
     def tag(name, values)
@@ -114,7 +130,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # space = (" " | "\t")
+  # space = (" " | "\t" | ",")
   def _space
 
     _save = self.pos
@@ -125,6 +141,9 @@ class Fehu::Parser < KPeg::CompiledParser
       _tmp = match_string("\t")
       break if _tmp
       self.pos = _save
+      _tmp = match_string(",")
+      break if _tmp
+      self.pos = _save
       break
     end # end choice
 
@@ -132,20 +151,9 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # nl = ("\n" | ";")
+  # nl = "\n"
   def _nl
-
-    _save = self.pos
-    while true # choice
-      _tmp = match_string("\n")
-      break if _tmp
-      self.pos = _save
-      _tmp = match_string(";")
-      break if _tmp
-      self.pos = _save
-      break
-    end # end choice
-
+    _tmp = match_string("\n")
     set_failed_rule :_nl unless _tmp
     return _tmp
   end
@@ -200,7 +208,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # eoe = - (comment | nl) brsp
+  # eoe = - (comment | ";" | nl) brsp
   def _eoe
 
     _save = self.pos
@@ -214,6 +222,9 @@ class Fehu::Parser < KPeg::CompiledParser
       _save1 = self.pos
       while true # choice
         _tmp = apply(:_comment)
+        break if _tmp
+        self.pos = _save1
+        _tmp = match_string(";")
         break if _tmp
         self.pos = _save1
         _tmp = apply(:_nl)
@@ -1228,13 +1239,13 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # string_seq = < /[^\\"]+/ > { text }
+  # string_seq = < /[^\\"\n]+/ > { text }
   def _string_seq
 
     _save = self.pos
     while true # sequence
       _text_start = self.pos
-      _tmp = scan(/\A(?-mix:[^\\"]+)/)
+      _tmp = scan(/\A(?-mix:[^\\"\n]+)/)
       if _tmp
         text = get_text(_text_start)
       end
@@ -1311,7 +1322,7 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # string = "\"" string_body:s "\"" {string(s.join)}
+  # string = "\"" string_body:s "\"" {strlit(s.join)}
   def _string
 
     _save = self.pos
@@ -1332,7 +1343,7 @@ class Fehu::Parser < KPeg::CompiledParser
         self.pos = _save
         break
       end
-      @result = begin; string(s.join); end
+      @result = begin; strlit(s.join); end
       _tmp = true
       unless _tmp
         self.pos = _save
@@ -1344,12 +1355,23 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # parameters = expr:h (brsp expr)*:t { [h] + t }
+  # parameters = (expr | blank):h (brsp (expr | blank))*:t { [h] + t }
   def _parameters
 
     _save = self.pos
     while true # sequence
-      _tmp = apply(:_expr)
+
+      _save1 = self.pos
+      while true # choice
+        _tmp = apply(:_expr)
+        break if _tmp
+        self.pos = _save1
+        _tmp = apply(:_blank)
+        break if _tmp
+        self.pos = _save1
+        break
+      end # end choice
+
       h = @result
       unless _tmp
         self.pos = _save
@@ -1358,16 +1380,27 @@ class Fehu::Parser < KPeg::CompiledParser
       _ary = []
       while true
 
-        _save2 = self.pos
+        _save3 = self.pos
         while true # sequence
           _tmp = apply(:_brsp)
           unless _tmp
-            self.pos = _save2
+            self.pos = _save3
             break
           end
-          _tmp = apply(:_expr)
+
+          _save4 = self.pos
+          while true # choice
+            _tmp = apply(:_expr)
+            break if _tmp
+            self.pos = _save4
+            _tmp = apply(:_blank)
+            break if _tmp
+            self.pos = _save4
+            break
+          end # end choice
+
           unless _tmp
-            self.pos = _save2
+            self.pos = _save3
           end
           break
         end # end sequence
@@ -1394,7 +1427,29 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # call = ("[" (atom | lambda):a brsp parameters:b - "]" {call(a, b)} | literal)
+  # blank = "_" {blank()}
+  def _blank
+
+    _save = self.pos
+    while true # sequence
+      _tmp = match_string("_")
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      @result = begin; blank(); end
+      _tmp = true
+      unless _tmp
+        self.pos = _save
+      end
+      break
+    end # end sequence
+
+    set_failed_rule :_blank unless _tmp
+    return _tmp
+  end
+
+  # call = ("[" (atom | lambda):a brsp parameters:b - "]" {call(a, b)} | atom:a "!" {call(a, [])} | literal)
   def _call
 
     _save = self.pos
@@ -1455,6 +1510,30 @@ class Fehu::Parser < KPeg::CompiledParser
 
       break if _tmp
       self.pos = _save
+
+      _save3 = self.pos
+      while true # sequence
+        _tmp = apply(:_atom)
+        a = @result
+        unless _tmp
+          self.pos = _save3
+          break
+        end
+        _tmp = match_string("!")
+        unless _tmp
+          self.pos = _save3
+          break
+        end
+        @result = begin; call(a, []); end
+        _tmp = true
+        unless _tmp
+          self.pos = _save3
+        end
+        break
+      end # end sequence
+
+      break if _tmp
+      self.pos = _save
       _tmp = apply(:_literal)
       break if _tmp
       self.pos = _save
@@ -1465,71 +1544,91 @@ class Fehu::Parser < KPeg::CompiledParser
     return _tmp
   end
 
-  # arguments = literal:h (sp literal)*:t { [h] + t }
+  # arguments = (literal:h (sp literal)*:t { [h] + t } | < "!" > { [] })
   def _arguments
 
     _save = self.pos
-    while true # sequence
-      _tmp = apply(:_literal)
-      h = @result
-      unless _tmp
-        self.pos = _save
-        break
-      end
-      _ary = []
-      while true
+    while true # choice
 
-        _save2 = self.pos
-        while true # sequence
-          _tmp = apply(:_sp)
-          unless _tmp
-            self.pos = _save2
-            break
-          end
-          _tmp = apply(:_literal)
-          unless _tmp
-            self.pos = _save2
-          end
+      _save1 = self.pos
+      while true # sequence
+        _tmp = apply(:_literal)
+        h = @result
+        unless _tmp
+          self.pos = _save1
           break
-        end # end sequence
+        end
+        _ary = []
+        while true
 
-        _ary << @result if _tmp
-        break unless _tmp
-      end
-      _tmp = true
-      @result = _ary
-      t = @result
-      unless _tmp
-        self.pos = _save
+          _save3 = self.pos
+          while true # sequence
+            _tmp = apply(:_sp)
+            unless _tmp
+              self.pos = _save3
+              break
+            end
+            _tmp = apply(:_literal)
+            unless _tmp
+              self.pos = _save3
+            end
+            break
+          end # end sequence
+
+          _ary << @result if _tmp
+          break unless _tmp
+        end
+        _tmp = true
+        @result = _ary
+        t = @result
+        unless _tmp
+          self.pos = _save1
+          break
+        end
+        @result = begin;  [h] + t ; end
+        _tmp = true
+        unless _tmp
+          self.pos = _save1
+        end
         break
-      end
-      @result = begin;  [h] + t ; end
-      _tmp = true
-      unless _tmp
-        self.pos = _save
-      end
+      end # end sequence
+
+      break if _tmp
+      self.pos = _save
+
+      _save4 = self.pos
+      while true # sequence
+        _text_start = self.pos
+        _tmp = match_string("!")
+        if _tmp
+          text = get_text(_text_start)
+        end
+        unless _tmp
+          self.pos = _save4
+          break
+        end
+        @result = begin;  [] ; end
+        _tmp = true
+        unless _tmp
+          self.pos = _save4
+        end
+        break
+      end # end sequence
+
+      break if _tmp
+      self.pos = _save
       break
-    end # end sequence
+    end # end choice
 
     set_failed_rule :_arguments unless _tmp
     return _tmp
   end
 
-  # lambda = "[" sp arguments:a sp "->" sp expr:b sp "]" {lambda(a, b)}
-  def _lambda
+  # case = arguments:a sp "->" sp expr:b {lcase(a, b)}
+  def _case
 
     _save = self.pos
     while true # sequence
-      _tmp = match_string("[")
-      unless _tmp
-        self.pos = _save
-        break
-      end
-      _tmp = apply(:_sp)
-      unless _tmp
-        self.pos = _save
-        break
-      end
       _tmp = apply(:_arguments)
       a = @result
       unless _tmp
@@ -1557,6 +1656,76 @@ class Fehu::Parser < KPeg::CompiledParser
         self.pos = _save
         break
       end
+      @result = begin; lcase(a, b); end
+      _tmp = true
+      unless _tmp
+        self.pos = _save
+      end
+      break
+    end # end sequence
+
+    set_failed_rule :_case unless _tmp
+    return _tmp
+  end
+
+  # lambda = "[" sp case:a (brsp "|" brsp case)*:b sp "]" {lambda([a].concat(b))}
+  def _lambda
+
+    _save = self.pos
+    while true # sequence
+      _tmp = match_string("[")
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      _tmp = apply(:_sp)
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      _tmp = apply(:_case)
+      a = @result
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      _ary = []
+      while true
+
+        _save2 = self.pos
+        while true # sequence
+          _tmp = apply(:_brsp)
+          unless _tmp
+            self.pos = _save2
+            break
+          end
+          _tmp = match_string("|")
+          unless _tmp
+            self.pos = _save2
+            break
+          end
+          _tmp = apply(:_brsp)
+          unless _tmp
+            self.pos = _save2
+            break
+          end
+          _tmp = apply(:_case)
+          unless _tmp
+            self.pos = _save2
+          end
+          break
+        end # end sequence
+
+        _ary << @result if _tmp
+        break unless _tmp
+      end
+      _tmp = true
+      @result = _ary
+      b = @result
+      unless _tmp
+        self.pos = _save
+        break
+      end
       _tmp = apply(:_sp)
       unless _tmp
         self.pos = _save
@@ -1567,7 +1736,7 @@ class Fehu::Parser < KPeg::CompiledParser
         self.pos = _save
         break
       end
-      @result = begin; lambda(a, b); end
+      @result = begin; lambda([a].concat(b)); end
       _tmp = true
       unless _tmp
         self.pos = _save
@@ -1581,12 +1750,12 @@ class Fehu::Parser < KPeg::CompiledParser
 
   Rules = {}
   Rules[:_eof] = rule_info("eof", "!.")
-  Rules[:_space] = rule_info("space", "(\" \" | \"\\t\")")
-  Rules[:_nl] = rule_info("nl", "(\"\\n\" | \";\")")
+  Rules[:_space] = rule_info("space", "(\" \" | \"\\t\" | \",\")")
+  Rules[:_nl] = rule_info("nl", "\"\\n\"")
   Rules[:_sp] = rule_info("sp", "space+")
   Rules[:__hyphen_] = rule_info("-", "space*")
   Rules[:_brsp] = rule_info("brsp", "(space | nl)*")
-  Rules[:_eoe] = rule_info("eoe", "- (comment | nl) brsp")
+  Rules[:_eoe] = rule_info("eoe", "- (comment | \";\" | nl) brsp")
   Rules[:_literal] = rule_info("literal", "(tag | float | int | string | atom)")
   Rules[:_pipe] = rule_info("pipe", "(pipe:a brsp \">\" - call:b {call(b, [a])} | (call | lambda):a brsp \">\" - (call | lambda):b {call(b, [a])})")
   Rules[:_bind] = rule_info("bind", "atom:a - \"=\" - expr:b {bind(a, b)}")
@@ -1603,12 +1772,14 @@ class Fehu::Parser < KPeg::CompiledParser
   Rules[:_tag] = rule_info("tag", "(\":\" name:n (space call)+:l {tag(n, l)} | \":\" name:n {tag(n, [])} | \"(\" - tag:t - \")\" { t })")
   Rules[:_num_escapes] = rule_info("num_escapes", "(< /[0-7]{1,3}/ > { [text.to_i(8)].pack(\"U\") } | \"x\" < /[a-f\\d]{2}/i > { [text.to_i(16)].pack(\"U\") })")
   Rules[:_string_escapes] = rule_info("string_escapes", "(\"n\" { \"\\n\" } | \"s\" { \" \" } | \"r\" { \"\\r\" } | \"t\" { \"\\t\" } | \"v\" { \"\\v\" } | \"f\" { \"\\f\" } | \"b\" { \"\\b\" } | \"a\" { \"\\a\" } | \"e\" { \"\\e\" } | \"\\\\\" { \"\\\\\" } | \"\\\"\" { \"\\\"\" } | num_escapes | < . > { text })")
-  Rules[:_string_seq] = rule_info("string_seq", "< /[^\\\\\"]+/ > { text }")
+  Rules[:_string_seq] = rule_info("string_seq", "< /[^\\\\\"\\n]+/ > { text }")
   Rules[:_string_body] = rule_info("string_body", "(\"\\\\\" string_escapes:s | string_seq:s)*:ary { Array(ary) }")
-  Rules[:_string] = rule_info("string", "\"\\\"\" string_body:s \"\\\"\" {string(s.join)}")
-  Rules[:_parameters] = rule_info("parameters", "expr:h (brsp expr)*:t { [h] + t }")
-  Rules[:_call] = rule_info("call", "(\"[\" (atom | lambda):a brsp parameters:b - \"]\" {call(a, b)} | literal)")
-  Rules[:_arguments] = rule_info("arguments", "literal:h (sp literal)*:t { [h] + t }")
-  Rules[:_lambda] = rule_info("lambda", "\"[\" sp arguments:a sp \"->\" sp expr:b sp \"]\" {lambda(a, b)}")
+  Rules[:_string] = rule_info("string", "\"\\\"\" string_body:s \"\\\"\" {strlit(s.join)}")
+  Rules[:_parameters] = rule_info("parameters", "(expr | blank):h (brsp (expr | blank))*:t { [h] + t }")
+  Rules[:_blank] = rule_info("blank", "\"_\" {blank()}")
+  Rules[:_call] = rule_info("call", "(\"[\" (atom | lambda):a brsp parameters:b - \"]\" {call(a, b)} | atom:a \"!\" {call(a, [])} | literal)")
+  Rules[:_arguments] = rule_info("arguments", "(literal:h (sp literal)*:t { [h] + t } | < \"!\" > { [] })")
+  Rules[:_case] = rule_info("case", "arguments:a sp \"->\" sp expr:b {lcase(a, b)}")
+  Rules[:_lambda] = rule_info("lambda", "\"[\" sp case:a (brsp \"|\" brsp case)*:b sp \"]\" {lambda([a].concat(b))}")
   # :startdoc:
 end
