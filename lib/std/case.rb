@@ -1,5 +1,3 @@
-require 'pp'
-
 module Fehu
 module Std
 
@@ -11,22 +9,17 @@ module Std
     end
 
     def call(args)
-      return unless args.size == @params.size
-      
-      params = @params.zip(args).to_h
-      return unless matched(params)
+      return :no_match unless args.size == @params.size
+      return :no_match unless @params.match?(args)
 
-      env = @env.merge(params)
+      matches = matched @params.zip(args)
+      env = @env.merge(matches.to_h)
+      env.delete :_
       @expr.run(env) 
     end
 
     def matched(params)
-      params.map do |arg, value|
-        case arg
-        when Fixnum then arg == value
-        when Symbol then true
-        end
-      end.all?
+      params.reduce([]){|m, (arg, value)| m.concat(arg.matches value) }
     end
   end
 

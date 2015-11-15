@@ -3,7 +3,7 @@ class Fehu::AST::Atom
     "#{@name}"
   end
 
-  def run(_env)
-    @name.to_sym
+  def run(env)
+    env[@name.to_sym] || @name.to_sym
   end
 end

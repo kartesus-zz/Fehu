@@ -34,5 +34,4 @@ else
   script = File.read(ARGV[0])
   env = {}
   ast(script).each{|node| node.run(env) }
-  puts
 end

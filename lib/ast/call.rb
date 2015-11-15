@@ -26,12 +26,6 @@ class Fehu::AST::Call
   end
 
   def arguments(args, env)
-    args.map do |arg|
-      if arg.class.name =~ /Atom/
-        env.fetch(arg.run(env))
-      else
-        arg.run(env)
-      end
-    end
+    args.map {|arg| arg.run(env) }
   end
 end

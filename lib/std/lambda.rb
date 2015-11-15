@@ -10,8 +10,9 @@ module Std
     def call(args)
       for c in @cases
         result = c.run(@env).call(args)
-        return result if result
+        return result unless result == :no_match
       end
+      raise "No match"
     end
   end
 
