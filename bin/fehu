@@ -1,0 +1,18 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'kpeg'
+require 'readline'
+
+module Fehu; end
+
+KPeg.load File.expand_path('../../grammar.kpeg', __FILE__), "Fehu::Parser"
+
+while sourcecode = Readline.readline("> ", true)
+  begin
+    parser = Fehu::Parser.new(sourcecode)
+    parser.parse ? (puts parser.result) : parser.raise_error
+  rescue => e
+    puts "Error: #{e}"
+  end
+end

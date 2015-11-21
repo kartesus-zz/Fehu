@@ -1,0 +1,33 @@
+%% {
+  attr_reader :result
+}
+
+%% ast-location = ::Fehu::AST
+%% comment      = ast Comment(text)
+%% number       = ast Number(value)
+%% ident        = ast Identifier(name)
+%% call         = ast Call(lambda, arguments)
+
+eof   = !.
+space = " " | "\t" | ","
+sp     = space+
+-     = space*
+nl    = "\n"
+br    = (space | nl)*
+
+comment = "--" < (!nl .)* > nl ~comment(text)
+number  = < ("0" | /[1-9][0-9]*/) > { text }
+integer = number:n ~number(n.to_i)
+float   = number:w "." number:f ~number("#{w}.#{f}".to_f)
+
+letter     = < /[a-z]/ > { text }
+digit      = < /[0-9]/ > { text }
+capital    = < /[A-Z]/ > { text }
+initial    = < letter | capital | "!" | "?" > { text }
+subsequent = < initial | digit | "/" | "-" > { text }
+identifier = < initial subsequent* > ~ident(text)
+
+expression = float | integer | identifier
+call       = "[" identifier:l (br expression)+:a - "]" ~call(l, a)
+
+root = (expression | call):r eof { @result = r }

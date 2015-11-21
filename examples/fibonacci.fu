@@ -1,6 +1,0 @@
-fib = [ 0 -> 0 
-      | 1 -> 1 
-      | n -> [add [subtr n 1] > fib
-                  [subtr n 2] > fib] ]
-
-[fib 6] > puts
