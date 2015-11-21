@@ -38,10 +38,13 @@ Hello = [ name -> [str "Hello, " name] ]
 Lambdas may have many clauses, separated by `|`, to pattern match.
 ```
 Greet = [ greeting name -> [str greeting ", " name]
-        | name -> [Greet "Hello" name] ]
+        | name          -> [Greet "Hello" name]
+        | #nil          -> [Greet "Hello" "World" ]
 
 [Greet "Hallo" "Welt"] -- "Hallo, Welt"
 [Greet "World"] -- "Hello, World"
+[Greet #nil] -- "Hello World"
+[Greet] -- "Hello, World"
 ```
 
 Parameters can also be pattern matched agains one-parameter functions
