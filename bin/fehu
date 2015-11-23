@@ -11,7 +11,8 @@ KPeg.load File.expand_path('../../grammar.kpeg', __FILE__), "Fehu::Parser"
 while sourcecode = Readline.readline("> ", true)
   begin
     parser = Fehu::Parser.new(sourcecode)
-    parser.parse ? (puts parser.result) : parser.raise_error
+    ast    = parser.parse ? parser.result : parser.raise_error
+    p ast
   rescue => e
     puts "Error: #{e}"
   end

@@ -6,7 +6,16 @@
 %% comment      = ast Comment(text)
 %% number       = ast Number(value)
 %% ident        = ast Identifier(name)
-%% call         = ast Call(lambda, arguments)
+%% call         = ast Call(callable, arguments)
+%% lcase        = ast Case(arguments, expression)
+%% lamb         = ast Lambda(cases)
+%% bind         = ast Bind(identifier, expression)
+%% into         = ast Into(incoming, outgoing)
+%% blank        = ast Blank()
+%% tag          = ast Tag(name, values)
+%% list         = ast List(items)
+%% map          = ast Map(items)
+%% cons         = ast Cons(head, tail)
 
 eof   = !.
 space = " " | "\t" | ","
@@ -26,8 +35,33 @@ capital    = < /[A-Z]/ > { text }
 initial    = < letter | capital | "!" | "?" > { text }
 subsequent = < initial | digit | "/" | "-" > { text }
 identifier = < initial subsequent* > ~ident(text)
+blank      = "_" ~blank()
+list       = "'[" (br expression)*:e br "]" ~list(e)
+map        = "'{" (br expression)*:e br "}" ~map(e)
 
-expression = float | integer | identifier
-call       = "[" identifier:l (br expression)+:a - "]" ~call(l, a)
+tag        = "#" identifier:n (space expression)+:l ~tag(n, l)
+           | "#" identifier:n ~tag(n, [])
+           | "(" - tag:t - ")" { t }
 
-root = (expression | call):r eof { @result = r }
+literal = map | list | tag | float | integer
+
+expression = cons | into | lambda | call | blank | literal | identifier | "(" - expression - ")"
+into       = into:i br ">" - call:o ~into(i, o)
+           | (literal | call | lambda | identifier | blank):i br ">" sp (lambda | call):o ~into(i, o)
+           | "(" - into - ")"
+
+cons       = literal:i sp "." sp list:l ~cons(i,l) 
+           | map:i sp "." sp map:l ~cons(i, l) 
+           | literal:i sp "." sp cons:l ~cons(i,l)
+           | map:i sp "." sp cons:l ~cons(i,l)
+
+call       = "[" identifier:i (br expression)+:a - "]" ~call(i, a)
+           | "[" identifier:i "]" ~call(i, nil)
+arguments = (literal | identifier | blank):h (sp (literal | identifier))*:t { [h] + t } 
+case      = arguments:a sp "->" sp expression:b ~lcase(a, b)
+lambda     = "[" sp case:a (br "|" br case)*:b sp "]" ~lamb([a].concat(b))
+
+definition = bind
+bind       = identifier:i sp "=" sp expression:e ~bind(i, e)
+
+root = (definition | expression):r eof { @result = r }
